@@ -5,6 +5,8 @@
 ├── src
 │   ├── assets
 │   │   └── react.svg
+│   ├── components
+│   │   └── SorteoApp.tsx
 │   ├── App.css
 │   ├── App.tsx
 │   ├── index.css
@@ -14,11 +16,15 @@
 ├── index.html
 ├── package-lock.json
 ├── package.json
+├── postcss.config.js
 ├── README.md
 ├── structure.txt
+├── tailwind.config.js
 ├── tsconfig.app.json
+├── tsconfig.app.tsbuildinfo
 ├── tsconfig.json
 ├── tsconfig.node.json
+├── tsconfig.node.tsbuildinfo
 └── vite.config.ts
 
-4 directories, 18 files
+5 directories, 23 files
