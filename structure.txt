@@ -1,0 +1,24 @@
+.
+├── public
+│   ├── participantes.csv
+│   └── vite.svg
+├── src
+│   ├── assets
+│   │   └── react.svg
+│   ├── App.css
+│   ├── App.tsx
+│   ├── index.css
+│   ├── main.tsx
+│   └── vite-env.d.ts
+├── eslint.config.js
+├── index.html
+├── package-lock.json
+├── package.json
+├── README.md
+├── structure.txt
+├── tsconfig.app.json
+├── tsconfig.json
+├── tsconfig.node.json
+└── vite.config.ts
+
+4 directories, 18 files
