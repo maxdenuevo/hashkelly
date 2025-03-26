@@ -1,59 +1,4 @@
-// Función para sortear un número
-const sortearNumero = (): void => {
-    // Verificar si ya tenemos 3 ganadores (todos los premios sorteados)
-    if (ganadores.length >= 3) {
-      setSorteando(false);
-      return;
-    }
-    
-    // Filtramos solo los números vendidos que no han ganado aún
-    const numerosVendidos = generarNumeros()
-      .filter(n => n.vendido && !ganadores.includes(n.numero));
-    
-    // Si no hay más números disponibles, terminamos
-    if (numerosVendidos.length === 0) {
-      setSorteando(false);
-      return;
-    }
-
-    // Efecto de "ruleta" rápida
-    let contador = 0;
-    const intervalId = setInterval(() => {
-      const indiceAleatorio = Math.floor(Math.random() * numerosVendidos.length);
-      setNumeroActual(numerosVendidos[indiceAleatorio].numero);
-      
-      contador++;
-      if (contador > 20) { // Después de 20 iteraciones, paramos
-        clearInterval(intervalId);
-        const numeroGanador = numerosVendidos[indiceAleatorio].numero;
-        
-        // Usamos una función de callback para tener el valor actualizado de ganadores
-        setGanadores(prevGanadores => {
-          const nuevosGanadores = [...prevGanadores, numeroGanador];
-          
-          // Lanzar confetti al conseguir un ganador
-          lanzarConfetti();
-          
-          // Verificamos si con este nuevo ganador llegamos a 3
-          if (nuevosGanadores.length >= 3) {
-            // Si con este ganador llegamos a 3, detenemos el sorteo y lanzamos confetti extra
-            setSorteando(false);
-            // Confetti extra al completar todos los premios
-            setTimeout(() => {
-              lanzarConfetti();
-              setTimeout(lanzarConfetti, 500);
-              setTimeout(lanzarConfetti, 1000);
-            }, 300);
-          } else {
-            // Si aún no llegamos a 3, continuamos con el siguiente sorteo
-            setTimeout(sortearNumero, 2000);
-          }
-          
-          return nuevosGanadores;
-        });
-      }
-    }, 100);
-  };import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Papa from 'papaparse';
 import confetti from 'canvas-confetti';
 
@@ -183,6 +128,63 @@ const SorteoApp: React.FC = () => {
     // Pequeño retraso para asegurar que el estado se ha actualizado
     setTimeout(() => {
       sortearNumero();
+    }, 100);
+  };
+
+  // Función para sortear un número
+  const sortearNumero = (): void => {
+    // Verificar si ya tenemos 3 ganadores (todos los premios sorteados)
+    if (ganadores.length >= 3) {
+      setSorteando(false);
+      return;
+    }
+    
+    // Filtramos solo los números vendidos que no han ganado aún
+    const numerosVendidos = generarNumeros()
+      .filter(n => n.vendido && !ganadores.includes(n.numero));
+    
+    // Si no hay más números disponibles, terminamos
+    if (numerosVendidos.length === 0) {
+      setSorteando(false);
+      return;
+    }
+
+    // Efecto de "ruleta" rápida
+    let contador = 0;
+    const intervalId = setInterval(() => {
+      const indiceAleatorio = Math.floor(Math.random() * numerosVendidos.length);
+      setNumeroActual(numerosVendidos[indiceAleatorio].numero);
+      
+      contador++;
+      if (contador > 20) { // Después de 20 iteraciones, paramos
+        clearInterval(intervalId);
+        const numeroGanador = numerosVendidos[indiceAleatorio].numero;
+        
+        // Usamos una función de callback para tener el valor actualizado de ganadores
+        setGanadores(prevGanadores => {
+          const nuevosGanadores = [...prevGanadores, numeroGanador];
+          
+          // Lanzar confetti al conseguir un ganador
+          lanzarConfetti();
+          
+          // Verificamos si con este nuevo ganador llegamos a 3
+          if (nuevosGanadores.length >= 3) {
+            // Si con este ganador llegamos a 3, detenemos el sorteo y lanzamos confetti extra
+            setSorteando(false);
+            // Confetti extra al completar todos los premios
+            setTimeout(() => {
+              lanzarConfetti();
+              setTimeout(lanzarConfetti, 500);
+              setTimeout(lanzarConfetti, 1000);
+            }, 300);
+          } else {
+            // Si aún no llegamos a 3, continuamos con el siguiente sorteo
+            setTimeout(sortearNumero, 2000);
+          }
+          
+          return nuevosGanadores;
+        });
+      }
     }, 100);
   };
 

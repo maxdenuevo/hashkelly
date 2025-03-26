@@ -1,0 +1,48 @@
+# Archivos de desarrollo
+
+.git
+.github
+.gitignore
+.eslintrc
+.prettierrc
+.editorconfig
+_.log
+_.todo
+.vscode
+.idea
+.DS_Store
+
+# Archivos que no son necesarios para la construcción
+
+README.md
+LICENSE
+structure.txt
+_.md
+_.map
+
+# Carpetas con archivos fuente que serán procesados en la compilación
+
+# (no es necesario ignorarlos ya que Vercel solo usa los archivos generados)
+
+src/assets/components
+
+# Dependencias (Vercel ya ignora node_modules por defecto)
+
+node_modules
+
+# Archivos de prueba
+
+**/\*.test.ts
+**/_.test.tsx
+\*\*/_.spec.ts
+**/\*.spec.tsx
+**tests**
+**/**tests**
+test
+tests
+
+# Otros archivos de configuración no necesarios para la build
+
+.npmrc
+.yarnrc
+.nvmrc
