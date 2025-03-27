@@ -18,28 +18,29 @@ interface NumeroRifa {
 }
 
 interface Premio {
+  id: number;
   nombre: string;
-  posicion: number;
+  sorteado: boolean;
+  numeroGanador: number | null;
+  sorteando: boolean;
 }
 
 const SorteoApp: React.FC = () => {
   // Estados con tipado
   const [participantes, setParticipantes] = useState<Participante[]>([]);
-  const [ganadores, setGanadores] = useState<number[]>([]);
   const [numeroActual, setNumeroActual] = useState<number | null>(null);
-  const [sorteando, setSorteando] = useState<boolean>(false);
   const [vista, setVista] = useState<'grilla' | 'sorteo'>('grilla');
-  const [etapaSorteo, setEtapaSorteo] = useState<number>(0); // 0: sin iniciar, 1-3: premios
+  const [modoFiesta, setModoFiesta] = useState<boolean>(false);
+  
+  // Premios con su estado
+  const [premios, setPremios] = useState<Premio[]>([
+    { id: 1, nombre: "Cafetera", sorteado: false, numeroGanador: null, sorteando: false },
+    { id: 2, nombre: "Minipymer", sorteado: false, numeroGanador: null, sorteando: false },
+    { id: 3, nombre: "Sanguchera", sorteado: false, numeroGanador: null, sorteando: false }
+  ]);
   
   // Número de WhatsApp para contacto
   const numeroWhatsApp = "+56947366008";
-  
-  // premios disponibles
-  const premios: Premio[] = [
-    { nombre: "Cafetera", posicion: 1 },
-    { nombre: "Sanguchera", posicion: 2 },
-    { nombre: "Minipymer", posicion: 3 }
-  ];
 
   useEffect(() => {
     // fn para cargar el CSV desde /public
@@ -84,18 +85,41 @@ const SorteoApp: React.FC = () => {
     cargarCSV();
   }, []);
 
+  useEffect(() => {
+    const todosLosPremiossortados = premios.every(premio => premio.sorteado);
+    
+    if (todosLosPremiossortados && premios.some(p => p.sorteado)) {
+      console.log("TODOS LOS PREMIOS SORTEADOS - ¡ACTIVANDO FIESTA!");
+      setModoFiesta(true);
+      
+      const lanzarConfettiFiesta = () => {
+        lanzarConfetti(1.5);
+        setTimeout(() => lanzarConfetti(2), 300);
+        setTimeout(() => lanzarConfetti(2.5), 600);
+      };
+      
+      lanzarConfettiFiesta();
+      
+      const intervalId = setInterval(() => {
+        lanzarConfetti(Math.random() * 2 + 1);
+      }, 800);
+      
+      // Limpiar el intervalo cuando el componente se desmonte
+      return () => clearInterval(intervalId);
+    }
+  }, [premios]);
+
   // Función para generar todos los números de la rifa (1-200)
   const generarNumeros = (): NumeroRifa[] => {
     const numeros: NumeroRifa[] = [];
     
     // Generamos exactamente 200 números
     for (let i = 1; i <= 200; i++) {
-      // Buscamos si este número está vendido en la lista de participantes
       const participante = participantes.find(p => Number(p.numero) === i);
       
       numeros.push({
         numero: i,
-        vendido: !!participante, // Convertimos a booleano (true si existe participante, false si no)
+        vendido: !!participante, 
         nombre: participante ? participante.nombre : '',
         telefono: participante ? participante.telefono : ''
       });
@@ -108,18 +132,27 @@ const SorteoApp: React.FC = () => {
     return numeros;
   };
 
+  // Obtener números ganadores
+  const obtenerNumerosGanadores = (): number[] => {
+    return premios
+      .filter(premio => premio.sorteado && premio.numeroGanador !== null)
+      .map(premio => premio.numeroGanador!)
+      .filter(numero => numero !== null);
+  };
+
   // Función para obtener enlace a WhatsApp
   const obtenerEnlaceWhatsApp = (numero: number): string => {
-    const mensaje = encodeURIComponent(`Aiskely, quiero comprar el número ${numero} porfa`);
+    const mensaje = encodeURIComponent(`aiskely, quiero comprar el número ${numero}`);
     return `https://wa.me/${numeroWhatsApp.replace(/\D/g, '')}?text=${mensaje}`;
   };
 
   // Función para lanzar confetti
-  const lanzarConfetti = (): void => {
+  const lanzarConfetti = (intensidad: number = 1, origin: { x?: number, y?: number } = { y: 0.6 }): void => {
     confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 }
+      particleCount: 100 * intensidad,
+      spread: 70 + (intensidad * 10),
+      origin: origin,
+      colors: modoFiesta ? ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'] : undefined
     });
   };
 
@@ -133,41 +166,34 @@ const SorteoApp: React.FC = () => {
       .toUpperCase();
   };
 
-  // fn para iniciar el sorteo
-  const iniciarSorteo = (): void => {
-    // Reiniciamos todos los estados
-    setGanadores([]);
-    setNumeroActual(null);
-    setEtapaSorteo(1); // Iniciamos en la etapa 1
+  const sortearPremio = (premioId: number): void => {
+    setPremios(prevPremios => 
+      prevPremios.map(premio => 
+        premio.id === premioId 
+          ? { ...premio, sorteando: true } 
+          : premio
+      )
+    );
     
-    // Comenzamos el sorteo del primer premio
-    iniciarSorteoPremio();
-  };
-
-  // Función para continuar al siguiente premio
-  const continuarSorteo = (): void => {
-    if (etapaSorteo < 3) {
-      setEtapaSorteo(prevEtapa => prevEtapa + 1);
-      iniciarSorteoPremio();
-    }
-  };
-
-  // Función para iniciar el sorteo de un premio específico
-  const iniciarSorteoPremio = (): void => {
-    setSorteando(true);
     setNumeroActual(null);
     
-    // Filtramos solo los números vendidos que no han ganado aún
+    const numerosYaGanadores = obtenerNumerosGanadores();
+    
     const numerosVendidos = generarNumeros()
-      .filter(n => n.vendido && !ganadores.includes(n.numero));
+      .filter(n => n.vendido && !numerosYaGanadores.includes(n.numero));
     
     // Si no hay más números disponibles, terminamos
     if (numerosVendidos.length === 0) {
-      setSorteando(false);
+      setPremios(prevPremios => 
+        prevPremios.map(premio => 
+          premio.id === premioId 
+            ? { ...premio, sorteando: false } 
+            : premio
+        )
+      );
       return;
     }
 
-    // Efecto de "ruleta" rápida
     let contador = 0;
     const intervalId = setInterval(() => {
       const indiceAleatorio = Math.floor(Math.random() * numerosVendidos.length);
@@ -178,29 +204,40 @@ const SorteoApp: React.FC = () => {
         clearInterval(intervalId);
         const numeroGanador = numerosVendidos[indiceAleatorio].numero;
         
-        // Añadimos el ganador
-        setGanadores(prevGanadores => [...prevGanadores, numeroGanador]);
+        // Actualizamos el premio con su ganador
+        setPremios(prevPremios => 
+          prevPremios.map(premio => 
+            premio.id === premioId 
+              ? { 
+                  ...premio, 
+                  sorteando: false, 
+                  sorteado: true, 
+                  numeroGanador: numeroGanador 
+                } 
+              : premio
+          )
+        );
         
-        // Lanzar confetti al conseguir un ganador
+        // Lanzar confetti para celebrar este premio
         lanzarConfetti();
-        
-        // Terminamos la fase de sorteo
-        setSorteando(false);
-        
-        // Si es el último premio, lanzamos confetti extra
-        if (etapaSorteo === 3) {
-          setTimeout(() => {
-            lanzarConfetti();
-            setTimeout(lanzarConfetti, 500);
-            setTimeout(lanzarConfetti, 1000);
-          }, 300);
-        }
       }
     }, 100);
   };
 
+  // Reiniciar todos los sorteos
+  const reiniciarSorteos = (): void => {
+    setPremios([
+      { id: 1, nombre: "Cafetera", sorteado: false, numeroGanador: null, sorteando: false },
+      { id: 2, nombre: "Minipymer", sorteado: false, numeroGanador: null, sorteando: false },
+      { id: 3, nombre: "Sanguchera", sorteado: false, numeroGanador: null, sorteando: false }
+    ]);
+    setNumeroActual(null);
+    setModoFiesta(false);
+  };
+
   const renderizarGrilla = (): JSX.Element => {
     const numeros = generarNumeros();
+    const numerosGanadores = obtenerNumerosGanadores();
     
     const totalNumeros = 200;
     
@@ -227,7 +264,7 @@ const SorteoApp: React.FC = () => {
                   className={`
                     aspect-square p-2 rounded-lg text-center relative transition-all
                     bg-green-100 hover:bg-green-200
-                    ${ganadores.includes(num.numero) ? 'ring-2 ring-yellow-400' : ''}
+                    ${numerosGanadores.includes(num.numero) ? 'ring-2 ring-yellow-400' : ''}
                     flex flex-col items-center justify-center
                   `}
                   title={`${num.numero}: ${num.nombre} (${num.telefono})`}
@@ -236,7 +273,7 @@ const SorteoApp: React.FC = () => {
                   {num.vendido && (
                     <div className="text-xs">{obtenerIniciales(num.nombre)}</div>
                   )}
-                  {ganadores.includes(num.numero) && (
+                  {numerosGanadores.includes(num.numero) && (
                     <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full" title="¡Ganador!"></div>
                   )}
                 </div>
@@ -284,109 +321,110 @@ const SorteoApp: React.FC = () => {
 
   // Renderizado de la vista de sorteo
   const renderizarSorteo = (): JSX.Element => {
-    // Calculamos en qué etapa estamos
-    const premioActual = etapaSorteo > 0 ? premios[etapaSorteo - 1] : null;
+    // Calculamos cuántos premios han sido sorteados
+    const premiosSorteados = premios.filter(premio => premio.sorteado).length;
+    const todosLosPremiossortados = premios.every(premio => premio.sorteado);
+    const algunoSorteando = premios.some(premio => premio.sorteando);
     
     return (
       <div className="p-4 text-center">
         <h2 className="text-2xl font-bold mb-4">Rifa en Vivo</h2>
         
-        {/* Mostrar el estado del sorteo */}
-        <div className="mb-4">
-          {etapaSorteo === 0 ? (
-            <div className="text-lg">Presiona "Iniciar Rifa" para comenzar</div>
-          ) : (
-            <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200 inline-block">
-              <div className="font-bold text-lg">
-                {sorteando ? 'Sorteando...' : `Premio #${etapaSorteo}`}
-              </div>
-              {premioActual && (
-                <div className="text-md">{premioActual.nombre}</div>
-              )}
-            </div>
-          )}
-        </div>
-        
-        {/* Número actual en el sorteo */}
-        <div className="mb-6">
-          <div className={`text-6xl font-bold m-8 p-8 bg-yellow-100 rounded-lg inline-block min-w-60 transition-all ${sorteando ? 'animate-pulse' : ''}`}>
-            {numeroActual || '?'}
-          </div>
-        </div>
-        
-        {/* Mostrar ganadores */}
-        {ganadores.length > 0 && (
-          <div className="mb-8">
-            <h3 className="text-xl font-bold mb-4">Ganadores</h3>
-            <div className="flex justify-center gap-4 flex-wrap">
-              {ganadores.map((numero, index) => {
-                const ganador = participantes.find(p => Number(p.numero) === numero);
-                return (
-                  <div key={index} className="bg-green-100 p-4 rounded-lg shadow-md">
-                    <div className="bg-yellow-200 text-yellow-800 mb-2 py-1 px-3 rounded-full text-sm font-bold inline-block">
-                      {premios[index]?.nombre || `Premio #${index + 1}`}
-                    </div>
-                    <div className="font-bold text-2xl">{numero}</div>
-                    <div className="font-medium">{ganador?.nombre}</div>
-                    <div className="text-sm text-gray-600">{ganador?.telefono}</div>
-                  </div>
-                );
-              })}
+        {/* Mostrar el número actual si algún premio está sorteándose */}
+        {algunoSorteando && (
+          <div className="mb-6">
+            <div className={`text-6xl font-bold m-4 p-6 bg-yellow-100 rounded-lg inline-block min-w-32 ${algunoSorteando ? 'animate-pulse' : ''}`}>
+              {numeroActual || '?'}
             </div>
           </div>
         )}
         
-        {/* Botones de acción */}
-        <div className="flex justify-center flex-wrap gap-4">
-          {etapaSorteo === 0 ? (
-            // Botón para iniciar el sorteo
-            <button
-              onClick={iniciarSorteo}
-              className="p-4 rounded-lg text-white font-bold text-xl bg-blue-500 hover:bg-blue-600 shadow-md transition-colors"
-            >
-              Iniciar Rifa
-            </button>
-          ) : (
-            <>
-              {/* Si estamos esperando para continuar al siguiente premio */}
-              {!sorteando && etapaSorteo < 3 && ganadores.length === etapaSorteo && (
+        {/* Tarjetas de premios */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 mb-6">
+          {premios.map((premio) => {
+            // Determinar el estilo y contenido según el estado
+            let colorFondo = 'bg-gray-100';
+            let textoPrincipal = <span>Pendiente</span>;
+            let botonSorteo = null;
+            
+            // Si el premio está siendo sorteado
+            if (premio.sorteando) {
+              colorFondo = 'bg-yellow-100 animate-pulse';
+              textoPrincipal = <span className="font-bold">Sorteando...</span>;
+            }
+            // Si el premio ya ha sido sorteado
+            else if (premio.sorteado) {
+              colorFondo = 'bg-green-100';
+              const ganador = participantes.find(p => Number(p.numero) === premio.numeroGanador);
+              textoPrincipal = (
+                <div>
+                  <div className="font-bold text-2xl mb-1">{premio.numeroGanador}</div>
+                  {ganador && (
+                    <>
+                      <div>{ganador.nombre}</div>
+                      <div className="text-sm text-gray-600">{ganador.telefono}</div>
+                    </>
+                  )}
+                </div>
+              );
+            }
+            // Si el premio aún no ha sido sorteado
+            else {
+              botonSorteo = (
                 <button
-                  onClick={continuarSorteo}
-                  className="p-4 rounded-lg text-white font-bold text-xl bg-green-500 hover:bg-green-600 shadow-md transition-colors"
+                  onClick={() => sortearPremio(premio.id)}
+                  disabled={algunoSorteando}
+                  className={`
+                    mt-4 px-4 py-2 rounded-lg text-white font-bold
+                    ${algunoSorteando ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'}
+                  `}
                 >
-                  Sortear Siguiente Premio
+                  Sortear Este Premio
                 </button>
-              )}
-              
-              {/* Mostrar botón para reiniciar si ya terminamos o quieren reiniciar */}
-              {(!sorteando && (etapaSorteo === 3 || ganadores.length === 3)) && (
-                <button
-                  onClick={() => {
-                    setEtapaSorteo(0);
-                    setGanadores([]);
-                    setNumeroActual(null);
-                  }}
-                  className="p-4 rounded-lg text-white font-bold text-xl bg-blue-500 hover:bg-blue-600 shadow-md transition-colors"
-                >
-                  Reiniciar Rifa
-                </button>
-              )}
-            </>
-          )}
+              );
+            }
+            
+            return (
+              <div 
+                key={premio.id}
+                className={`p-4 rounded-lg shadow-md transition-all ${colorFondo} ${premio.sorteado ? 'ring-2 ring-green-500' : ''}`}
+              >
+                <div className="bg-blue-500 text-white py-2 px-3 rounded-full text-sm font-bold inline-block mb-3">
+                  Premio #{premio.id}
+                </div>
+                <h3 className="text-xl font-bold mb-3">{premio.nombre}</h3>
+                
+                <div className="mb-2">
+                  {textoPrincipal}
+                </div>
+                
+                {botonSorteo}
+              </div>
+            );
+          })}
         </div>
+        
+        {/* Botón para reiniciar todos los sorteos */}
+        {(premiosSorteados > 0) && (
+          <button
+            onClick={reiniciarSorteos}
+            disabled={algunoSorteando}
+            className={`
+              p-3 rounded-lg text-white font-bold text-lg mt-4
+              ${algunoSorteando ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600'}
+              ${todosLosPremiossortados && modoFiesta ? 'animate-bounce' : ''}
+            `}
+          >
+            Reiniciar Todos los Sorteos
+          </button>
+        )}
         
         {/* Mensaje informativo sobre el estado del sorteo */}
         <div className="mt-6 text-gray-600">
-          {etapaSorteo === 0 ? (
-            <p>Vamos a rifar 3 premios entre los números vendidos</p>
-          ) : ganadores.length === 3 ? (
-            <p className="font-medium">¡Rifa completada! Todos los premios fueron sorteados.</p>
+          {todosLosPremiossortados ? (
+            <div className="font-bold text-lg text-green-600">¡Todos los premios han sido sorteados!</div>
           ) : (
-            <p>
-              {sorteando ? 
-                `Sorteando premio #${etapaSorteo}...` : 
-                `Premios sorteados: ${ganadores.length}/3`}
-            </p>
+            <p>Premios sorteados: {premiosSorteados} de 3</p>
           )}
         </div>
       </div>
@@ -397,7 +435,27 @@ const SorteoApp: React.FC = () => {
   const numerosVendidos = generarNumeros().filter(n => n.vendido).length;
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
+    <div className={`max-w-4xl mx-auto p-4 transition-colors duration-300 ${modoFiesta ? 'modo-fiesta' : ''}`}>
+      {/* Estilos para la animación de luces de fiesta - SIEMPRE PRESENTES */}
+      <style>
+        {`
+          @keyframes cambioColores {
+            0% { background-color: rgba(255, 215, 0, 0.6); }
+            20% { background-color: rgba(255, 105, 180, 0.6); }
+            40% { background-color: rgba(138, 43, 226, 0.6); }
+            60% { background-color: rgba(30, 144, 255, 0.6); }
+            80% { background-color: rgba(50, 205, 50, 0.6); }
+            100% { background-color: rgba(255, 69, 0, 0.6); }
+          }
+          
+          .modo-fiesta {
+            animation: cambioColores 0.8s infinite;
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.7);
+          }
+        `}
+      </style>
+      
       <header className="mb-6">
         <h1 className="text-3xl font-bold text-center text-blue-600">Hashkelly - Rifa a beneficio</h1>
         
@@ -420,27 +478,44 @@ const SorteoApp: React.FC = () => {
           ¡{numerosVendidos} números vendidos de 200! - 3 super premios a sortear
         </p>
         
-        <div className="flex justify-center mt-4 gap-2 flex-wrap mb-4">
-          {premios.map((premio, idx) => (
-            <div key={idx} className="bg-yellow-50 p-3 rounded-lg border border-yellow-200 text-center shadow-sm">
-              <div className="font-bold">{premio.nombre}</div>
-              <div className="text-xs text-gray-600">Premio #{premio.posicion}</div>
-            </div>
-          ))}
-        </div>
-        
-        <nav className="flex justify-center mt-4 gap-2">
+        <nav className="flex justify-center mt-4 gap-2 flex-wrap">
           <button 
             onClick={() => setVista('grilla')}
             className={`px-4 py-2 rounded ${vista === 'grilla' ? 'bg-blue-500 text-white font-bold' : 'bg-gray-200'}`}
           >
-            Números
+            Grilla de Números
           </button>
           <button 
             onClick={() => setVista('sorteo')}
             className={`px-4 py-2 rounded ${vista === 'sorteo' ? 'bg-blue-500 text-white font-bold' : 'bg-gray-200'}`}
           >
-            Realizar Rifa
+            Realizar Sorteo
+          </button>
+          
+          {/* Botón para probar el modo fiesta */}
+          <button 
+            onClick={() => {
+              setModoFiesta(!modoFiesta);
+              if (!modoFiesta) {
+                console.log("Modo fiesta activado manualmente");
+                // Al activar, iniciamos los confetti
+                lanzarConfetti(1);
+                setTimeout(() => lanzarConfetti(1.5), 300);
+                setTimeout(() => lanzarConfetti(2), 600);
+                
+                // Temporizador para desactivar
+                setTimeout(() => {
+                  console.log("Desactivando modo fiesta automáticamente");
+                  setModoFiesta(false);
+                }, 10000);
+              } else {
+                console.log("Modo fiesta desactivado manualmente");
+              }
+            }}
+            className="px-4 py-2 rounded bg-purple-500 hover:bg-purple-600 text-white"
+            title="Prueba el efecto de luces de fiesta"
+          >
+            {modoFiesta ? '🎉 off' : '🎉 on'}
           </button>
         </nav>
       </header>
@@ -449,6 +524,53 @@ const SorteoApp: React.FC = () => {
         {vista === 'grilla' && renderizarGrilla()}
         {vista === 'sorteo' && renderizarSorteo()}
       </main>
+      
+      {modoFiesta && (
+        <div className="fixed inset-0 pointer-events-none z-10">
+          <style>
+            {`
+              @keyframes fiesta-confetti {
+                0%, 100% { opacity: 0; }
+                50% { opacity: 0.3; }
+              }
+              
+              .confetti-piece {
+                position: absolute;
+                width: 10px;
+                height: 20px;
+                background: #ff0;
+                opacity: 0;
+                animation: fiesta-confetti 1.5s ease-in-out infinite;
+              }
+            `}
+          </style>
+          
+          {/* Generar piezas de confetti estáticas */}
+          {[...Array(50)].map((_, i) => {
+            const colors = ['#f00', '#0f0', '#00f', '#ff0', '#f0f', '#0ff'];
+            const size = Math.floor(Math.random() * 10) + 5;
+            const left = Math.floor(Math.random() * 100);
+            const top = Math.floor(Math.random() * 100);
+            const delay = Math.random() * 2;
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            
+            return (
+              <div 
+                key={i}
+                className="confetti-piece"
+                style={{
+                  left: `${left}%`,
+                  top: `${top}%`,
+                  backgroundColor: color,
+                  width: `${size}px`,
+                  height: `${size * 2}px`,
+                  animationDelay: `${delay}s`
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
       
       <footer className="mt-8 text-center text-sm text-gray-500">
         <p>© {new Date().getFullYear()} TotalRifa - Desarrollado con ♥ por <a href="https://maxdenuevo.com" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Max</a></p>
